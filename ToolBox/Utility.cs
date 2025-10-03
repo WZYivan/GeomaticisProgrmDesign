@@ -4,7 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using ToolBox.Container;
-
+using static ToolBox.PPrinter;
+using static ToolBox.Utility.TerminalMessageMaker;
 namespace ToolBox
 {
     namespace Utility
@@ -65,7 +66,7 @@ namespace ToolBox
 
             public bool RollBack()
             {
-                if(VStack.TryPop(out T val))
+                if (VStack.TryPop(out T val))
                 {
                     Value = val;
                     return true;
@@ -82,7 +83,7 @@ namespace ToolBox
                 return new(this);
             }
 
-            public T[] InernalView() => VStack.ToFlattenArray();
+            public T[] InternalView() => VStack.ToFlattenArray();
 
             public class AutoBackwardsRollerToken(AutoBackwardsRoller<T> abr) : IDisposable
             {
@@ -100,7 +101,71 @@ namespace ToolBox
                 }
             }
         }
-    
-        
+
+
+        public static class TerminalMessageMaker
+        {
+            public static readonly string SystemPrefix = "[System]";
+            public static string Concat(params string[] msgs)
+            {
+                return string.Join(" ", msgs);
+            }
+            public static string FromSys(string msg)
+            {
+                return Concat(SystemPrefix, msg);
+            }
+
+        }
+        public interface IAcceptableAndGivableCore<T>
+        {
+            public void Accept(string line);
+            public string Give();
+            public bool NowQuit();
+            public string HowToQuit();
+            public void Terminate();
+        }
+        public class AcceptAndGiveTerminal<T>(IAcceptableAndGivableCore<T> core, TextReader tr, TextWriter tw)
+        {
+            private readonly IAcceptableAndGivableCore<T> _core = core;
+            private TextReader ins = tr;
+            private TextWriter outs = tw;
+            public void Initialize()
+            {
+                outs.WriteLine(FromSys(_core.HowToQuit()));
+                outs.WriteLine(FromSys("This is a simple (core) accept and give, (usr) give and accept interactive environment in terminal for scenes such as demo etc. ."));
+            }
+
+            public void DoBeforeQuit()
+            {
+                outs.WriteLine(FromSys("Bye."));
+            }
+
+            public void Start()
+            {
+                Initialize();
+
+                while (true)
+                {
+                    outs.Write(">> ");
+                    string? line = ins.ReadLine();
+
+                    _core.Accept(line ?? string.Empty);
+
+                    outs.WriteLine(_core.Give());
+
+                    if (_core.NowQuit())
+                    {
+                        break;
+                    }
+                }
+
+                DoBeforeQuit();
+            }
+
+            public void End()
+            {
+                _core.Terminate();
+            }
+        }
     }
 }
