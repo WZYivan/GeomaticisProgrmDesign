@@ -1,7 +1,7 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using ToolBox.PrattParsing;
 using ToolBox.PrattParsing.Token;
-using ToolBox.PrattParsing.Exprssion;
+using ToolBox.PrattParsing.Expression;
 
 namespace ToolBox.Tests
 {
@@ -350,7 +350,7 @@ namespace ToolBox.Tests
             var atomExpr = new AtomExpr(atom);
 
             // Act & Assert
-            Assert.AreEqual(ExprssionType.Atom, atomExpr.TypeOf());
+            Assert.AreEqual(ExpressionType.Atom, atomExpr.TypeOf());
             Assert.AreEqual("42", atomExpr.Expr());
             Assert.AreEqual(42.0, atomExpr.Value());
         }
@@ -362,10 +362,10 @@ namespace ToolBox.Tests
             var op = new Operator("+");
             var expr1 = new AtomExpr("2");
             var expr2 = new AtomExpr("3");
-            var operation = new Operation(op, new List<IExprssion> { expr1, expr2 });
+            var operation = new Operation(op, new List<IExpression> { expr1, expr2 });
 
             // Act & Assert
-            Assert.AreEqual(ExprssionType.Operation, operation.TypeOf());
+            Assert.AreEqual(ExpressionType.Operation, operation.TypeOf());
             Assert.AreEqual("(+ 2 3)", operation.Expr());
             Assert.AreEqual(5.0, operation.Value());
         }
