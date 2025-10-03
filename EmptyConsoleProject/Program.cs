@@ -19,6 +19,8 @@ namespace EmptyConsoleProject
             PPrint(pexpr.Eval().Expr());
             PPrint(pexpr.Eval().Value());
 
+            PPrint("Now entering interactive environment.");
+
             ToolBox.PrattParsing.InteractiveEnvironment.Connect();
         }
     }
