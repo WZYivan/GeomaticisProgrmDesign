@@ -4,8 +4,9 @@ using System.Data;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using ToolBox.PrattParsing.Exprssion;
+using ToolBox.PrattParsing.Expression;
 using ToolBox.PrattParsing.Token;
+using ToolBox.Utility;
 
 namespace ToolBox
 {
@@ -336,7 +337,7 @@ namespace ToolBox
                     /// <summary>
                     /// 负号操作
                     /// </summary>
-                    public static double Nagetive(params Atom[] atoms)
+                    public static double Negative(params Atom[] atoms)
                     {
                         return -atoms[0].Value();
                     }
@@ -421,7 +422,7 @@ namespace ToolBox
                         "+" => AlgoLib.Plus, // 加法
                         "-" => (argc) switch // 减法或负号（根据参数个数）
                         {
-                            1 => AlgoLib.Nagetive, // 一元负号
+                            1 => AlgoLib.Negative, // 一元负号
                             2 => AlgoLib.Minus,     // 二元减法
                             _ => default!
                         },
@@ -562,12 +563,12 @@ namespace ToolBox
             }
         }
 
-        namespace Exprssion
+        namespace Expression
         {
             /// <summary>
             /// 表达式类型枚举
             /// </summary>
-            public enum ExprssionType
+            public enum ExpressionType
             {
                 Atom,      // 原子表达式
                 Operation  // 操作表达式
@@ -576,12 +577,12 @@ namespace ToolBox
             /// <summary>
             /// 表达式接口，定义表达式的基本行为
             /// </summary>
-            public interface IExprssion
+            public interface IExpression
             {
                 /// <summary>
                 /// 获取表达式类型
                 /// </summary>
-                public ExprssionType TypeOf();
+                public ExpressionType TypeOf();
 
                 /// <summary>
                 /// 获取表达式的字符串表示
@@ -591,7 +592,7 @@ namespace ToolBox
                 /// <summary>
                 /// 计算表达式
                 /// </summary>
-                public IExprssion Eval();
+                public IExpression Eval();
 
                 /// <summary>
                 /// 获取表达式的值
@@ -602,14 +603,14 @@ namespace ToolBox
             /// <summary>
             /// 原子表达式类
             /// </summary>
-            public class AtomExpr(Atom atom) : IExprssion
+            public class AtomExpr(Atom atom) : IExpression
             {
                 private readonly Atom _atom = atom; // 原子对象
 
                 /// <summary>
                 /// 获取表达式类型
                 /// </summary>
-                public ExprssionType TypeOf() => ExprssionType.Atom;
+                public ExpressionType TypeOf() => ExpressionType.Atom;
 
                 /// <summary>
                 /// 获取表达式的字符串表示
@@ -624,7 +625,7 @@ namespace ToolBox
                 /// <summary>
                 /// 计算表达式（返回自身）
                 /// </summary>
-                public IExprssion Eval() => this;
+                public IExpression Eval() => this;
 
                 /// <summary>
                 /// 获取原子令牌
@@ -647,15 +648,15 @@ namespace ToolBox
             /// <summary>
             /// 操作表达式类
             /// </summary>
-            public class Operation(Operator oprt, List<IExprssion> exprs) : IExprssion
+            public class Operation(Operator oprt, List<IExpression> exprs) : IExpression
             {
                 private readonly Operator op = oprt;          // 操作符
-                private readonly List<IExprssion> _subExpr = exprs; // 子表达式列表
+                private readonly List<IExpression> _subExpr = exprs; // 子表达式列表
 
                 /// <summary>
                 /// 获取表达式类型
                 /// </summary>
-                public ExprssionType TypeOf() => ExprssionType.Operation;
+                public ExpressionType TypeOf() => ExpressionType.Operation;
 
                 /// <summary>
                 /// 获取表达式的字符串表示
@@ -676,7 +677,7 @@ namespace ToolBox
                 /// <summary>
                 /// 计算表达式
                 /// </summary>
-                public IExprssion Eval()
+                public IExpression Eval()
                 {
                     if (AllAtom()) // 如果所有子表达式都是原子
                     {
@@ -706,7 +707,7 @@ namespace ToolBox
                 /// </summary>
                 internal bool AllAtom()
                 {
-                    return _subExpr.All(_ => _.TypeOf() == ExprssionType.Atom);
+                    return _subExpr.All(_ => _.TypeOf() == ExpressionType.Atom);
                 }
             }
         }
@@ -889,7 +890,7 @@ namespace ToolBox
             /// <summary>
             /// 从字符串解析表达式
             /// </summary>
-            public static Exprssion.IExprssion FromStr(string str)
+            public static Expression.IExpression FromStr(string str)
             {
                 Lexer lexer = new(str); // 创建词法分析器
                 return ParseExpr(lexer, 0.0); // 开始解析
@@ -898,10 +899,10 @@ namespace ToolBox
             /// <summary>
             /// 解析表达式（Pratt解析算法的核心）
             /// </summary>
-            internal static IExprssion ParseExpr(Lexer lexer, double power)
+            internal static IExpression ParseExpr(Lexer lexer, double power)
             {
                 var lhsTk = lexer.Next(); // 获取左侧令牌
-                IExprssion lhs; // 左侧表达式
+                IExpression lhs; // 左侧表达式
 
                 if (lhsTk.TypeOf() == TokenType.Atom) // 如果是原子
                 {
@@ -967,6 +968,57 @@ namespace ToolBox
                 }
 
                 return lhs; // 返回解析结果
+            }
+        }
+
+        internal class PrattParsingInteractiveCore : IAcceptableAndGivableCore<PrattParsingInteractiveCore>
+        {
+            private string _inline = String.Empty, _outline = String.Empty;
+            private IExpression _expr = default!;
+            private bool _exit = false;
+            public void Accept(string line)
+            {
+                _inline = line;
+                _exit = line switch
+                {
+                    "q" or "quit" or "exit" => true,
+                    _ => false
+                };
+                try
+                {
+                    _expr = PrattParsing.Parse.FromStr(_inline);
+                }
+                catch (Exception ex)
+                {
+                    _outline = $"[Error] {ex.Message}";
+                    return;
+                }
+
+                _outline = $"[Echo] {_inline}\n" +
+                    $"[Parse] {_expr.Expr()}\n" +
+                    $"[Eval] {_expr.Value()}";
+            }
+
+            public string Give()
+            {
+                return _outline;
+            }
+            public string HowToQuit() => "Type \"q|quit|exit\" line to quit.";
+            public bool NowQuit() => _exit;
+            public void Terminate() => _exit = true;
+        }
+
+        public static class InteractiveEnvironment
+        {
+            internal static AcceptAndGiveTerminal<PrattParsingInteractiveCore> _shell = new(new PrattParsingInteractiveCore(), Console.In, Console.Out);
+            public static void Connect()
+            {
+                _shell.Start();
+            }
+
+            public static void Disconnect()
+            {
+                _shell.End();
             }
         }
     }
