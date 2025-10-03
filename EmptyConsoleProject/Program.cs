@@ -18,6 +18,8 @@ namespace EmptyConsoleProject
             PPrint(pexpr.Expr());
             PPrint(pexpr.Eval().Expr());
             PPrint(pexpr.Eval().Value());
+
+            ToolBox.PrattParsing.InteractiveEnvironment.Connect();
         }
     }
 }
