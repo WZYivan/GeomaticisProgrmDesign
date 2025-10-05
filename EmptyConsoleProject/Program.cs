@@ -1,6 +1,8 @@
 ﻿using System;
 using ToolBox;
 using ToolBox.PrattParsing;
+using ToolBox.PrattParsing.Expression;
+using ToolBox.PrattParsing.Token;
 using static ToolBox.FManip;
 using static ToolBox.PPrinter;
 
@@ -10,18 +12,20 @@ namespace EmptyConsoleProject
     {
         static void Main()
         {
-            var expr = "sin(1) + cos(2)";
+            var expr = "a ^ b - sin (x0!)";
             Lexer lexer = new(expr);
             PPrint(expr);
             PPrint(lexer.Expr());
-            var pexpr = Parse.FromStr(expr);
+
+            var pexpr = (Operation)Parse.FromStr(expr);
             PPrint(pexpr.Expr());
-            PPrint(pexpr.Eval().Expr());
+
+            bool algoAss = pexpr.AssignAlgebra(Parse.MakeAlgebraAssignmentMap("a", 3, "b", 2, "x0", 5));         
+            PPrint($"Algebra assignment success: {algoAss}");
             PPrint(pexpr.Eval().Value());
 
-            PPrint("Now entering interactive environment.");
-
-            ToolBox.PrattParsing.InteractiveEnvironment.Connect();
+            //PPrint("Now entering interactive environment.");
+            //ToolBox.PrattParsing.InteractiveEnvironment.Connect();
         }
     }
 }
