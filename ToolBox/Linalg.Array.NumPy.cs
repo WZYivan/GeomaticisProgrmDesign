@@ -125,7 +125,7 @@ namespace ToolBox
             public static double[] Difference(double[] sou, int degree)
             {
                 // 验证输入参数
-                if (sou == null) throw new ArgumentNullException(nameof(sou));
+                ArgumentNullException.ThrowIfNull(sou);
                 if (degree <= 0) throw new ArgumentException("差分阶数必须为正整数", nameof(degree));
 
                 int n = sou.Length;
