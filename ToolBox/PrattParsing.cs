@@ -158,6 +158,12 @@ namespace ToolBox
                     _str = $"{d}";
                     CheckValid();
                 }
+
+                public Atom(IToken token)
+                {
+                    _str = token.Expr();
+                    CheckValid();
+                }
             }
 
             /// <summary>
@@ -275,6 +281,7 @@ namespace ToolBox
                 /// 为变量赋值
                 /// </summary>
                 public void Assign(double v) => _value = v;
+
             }
 
             /// <summary>
@@ -603,9 +610,9 @@ namespace ToolBox
             /// <summary>
             /// 原子表达式类
             /// </summary>
-            public class AtomExpr(Atom atom) : IExpression
+            public class AtomExpr(IToken atom) : IExpression
             {
-                private readonly Atom _atom = atom; // 原子对象
+                private readonly IToken _atom = atom; // 原子对象
 
                 /// <summary>
                 /// 获取表达式类型
@@ -630,7 +637,7 @@ namespace ToolBox
                 /// <summary>
                 /// 获取原子令牌
                 /// </summary>
-                public Atom Token() => _atom;
+                public IToken Token() => _atom;
 
                 /// <summary>
                 /// 用字符串构造原子表达式
@@ -642,7 +649,6 @@ namespace ToolBox
                 /// <summary>
                 /// 用令牌构造原子表达式
                 /// </summary>
-                public AtomExpr(IToken tok) : this((Atom)(tok)) { }
             }
 
             /// <summary>
@@ -681,7 +687,7 @@ namespace ToolBox
                 {
                     if (AllAtom()) // 如果所有子表达式都是原子
                     {
-                        return new AtomExpr(new Atom(op.Eval([.. _subExpr.Select(_ => ((AtomExpr)_).Token())]))); // 执行计算
+                        return new AtomExpr(new Atom(op.Eval([.. _subExpr.Select(_ => (Atom)((AtomExpr)_).Token())]))); // 执行计算
                     }
 
                     return new Operation(op, [.. _subExpr.Select(_ => _.Eval())]); // 递归计算子表达式
@@ -694,7 +700,7 @@ namespace ToolBox
                 {
                     if (AllAtom()) // 如果所有子表达式都是原子
                     {
-                        return op.Eval([.. _subExpr.Select(_ => ((AtomExpr)_).Token())]); // 直接计算
+                        return op.Eval([.. _subExpr.Select(_ => (Atom)((AtomExpr)_).Token())]); // 直接计算
                     }
                     else
                     {
@@ -708,6 +714,42 @@ namespace ToolBox
                 internal bool AllAtom()
                 {
                     return _subExpr.All(_ => _.TypeOf() == ExpressionType.Atom);
+                }
+
+                public bool AssignAlgebra(Dictionary<string, double> map)
+                {
+                    bool allAssigned = true;
+                    for (int i = 0; i != _subExpr.Count; ++i)
+                    {
+                        var expr = _subExpr[i];
+                        var exprT = expr.TypeOf();
+
+                        if (exprT == ExpressionType.Atom)
+                        {
+                            var atomExpr = (AtomExpr)expr;
+                            var atomToken = atomExpr.Token();
+                            var atomTokenT = atomToken.TypeOf();
+
+                            if (atomTokenT == TokenType.AlgebraAtom)
+                            {
+                                var algeAtom = (AlgebraAtom)atomToken;
+                                if (map.ContainsKey(algeAtom.Expr()))
+                                {
+                                    _subExpr[i] = new AtomExpr(new Atom(map[algeAtom.Expr()]));
+                                }
+                                else
+                                {
+                                    return false;
+                                }
+                            }
+                        }
+                        else if (exprT == ExpressionType.Operation)
+                        {
+                            var opExpr = (Operation)expr;
+                            allAssigned &= opExpr.AssignAlgebra(map);
+                        }
+                    }
+                    return allAssigned;
                 }
             }
         }
@@ -762,6 +804,7 @@ namespace ToolBox
                 MergeAdjacentAtom(_items);      // 合并相邻数字原子
                 MergeDotPoint(_items);          // 处理小数点
                 MergeAdjacentAlgebraAtom(_items); // 合并相邻代数原子
+                MergeAdjacentAlgebraAtomAndAtomInOrder(_items);
             }
 
             /// <summary>
@@ -844,6 +887,22 @@ namespace ToolBox
                 }
             }
 
+            internal static void MergeAdjacentAlgebraAtomAndAtomInOrder(List<IToken> _items)
+            {
+                for (int i = _items.Count - 1; i > 0; --i)
+                {
+                    if (
+                       _items[i - 1].TypeOf() == TokenType.AlgebraAtom &&
+                        _items[i].TypeOf() == TokenType.Atom)
+                    {
+                        var lhs = (AlgebraAtom)_items[i-1];
+                        var rhs = (Atom)_items[i];
+                        lhs.MergeWith(new AlgebraAtom(rhs.Expr())); // 合并为原子
+                        _items.RemoveAt(i); // 移除已合并的原子
+                    }
+                }
+            }
+
             /// <summary>
             /// 获取词法分析器的表达式字符串
             /// </summary>
@@ -890,7 +949,7 @@ namespace ToolBox
             /// <summary>
             /// 从字符串解析表达式
             /// </summary>
-            public static Expression.IExpression FromStr(string str)
+            public static IExpression FromStr(string str)
             {
                 Lexer lexer = new(str); // 创建词法分析器
                 return ParseExpr(lexer, 0.0); // 开始解析
@@ -902,9 +961,9 @@ namespace ToolBox
             internal static IExpression ParseExpr(Lexer lexer, double power)
             {
                 var lhsTk = lexer.Next(); // 获取左侧令牌
+                var lhsTkT = lhsTk.TypeOf();
                 IExpression lhs; // 左侧表达式
-
-                if (lhsTk.TypeOf() == TokenType.Atom) // 如果是原子
+                if (lhsTkT == TokenType.Atom || lhsTkT == TokenType.AlgebraAtom) // 如果是原子
                 {
                     lhs = new AtomExpr(lhsTk);
                 }
@@ -968,6 +1027,32 @@ namespace ToolBox
                 }
 
                 return lhs; // 返回解析结果
+            }
+
+            public static Dictionary<string, double> MakeAlgebraAssignmentMap(params object[] args)
+            {
+                if (args.Length % 2 != 0)
+                {
+                    throw new ArgumentException($"{nameof(args)}.Length must be even");
+                }
+
+                Dictionary<string, double> map = new();
+
+                for (int i = 0; i != args.Length; i += 2)
+                {
+                    object key = args[i], value = args[i + 1];
+
+                    if (key is string sk && (!map.ContainsKey(sk)) && TryConvert.To(value, out double dv))
+                    {
+                        map.Add(sk, dv); Convert.ToDouble(value);
+                    }
+                    else
+                    {
+                        throw new ArgumentException($"args[{i}] must be string and args[{i + 1}] must be double and args[{i}] must not be duplicate in previous args");
+                    }
+                }
+
+                return map;
             }
         }
 
