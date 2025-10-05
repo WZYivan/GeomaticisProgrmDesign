@@ -127,8 +127,8 @@ namespace ToolBox
         public class AcceptAndGiveTerminal<T>(IAcceptableAndGivableCore<T> core, TextReader tr, TextWriter tw)
         {
             private readonly IAcceptableAndGivableCore<T> _core = core;
-            private TextReader ins = tr;
-            private TextWriter outs = tw;
+            private readonly TextReader ins = tr;
+            private readonly TextWriter outs = tw;
             public void Initialize()
             {
                 outs.WriteLine(FromSys(_core.HowToQuit()));
@@ -165,6 +165,42 @@ namespace ToolBox
             public void End()
             {
                 _core.Terminate();
+            }
+        }
+
+        public static class TryConvert
+        {
+
+            public static bool ToDouble(object? obj, out double val)
+            {
+                return Invoker.Try(Convert.ToDouble, obj, out val);
+            }
+
+            public static bool To<T>(object? obj, out T val) where T : IConvertible
+            {
+                return Invoker.Try(new Func<object, T>(static  _obj => (T)Convert.ChangeType(_obj, typeof(T))), obj, out val);
+            }
+        }
+
+        public static class Invoker
+        {
+            public static bool Try<TSrc, TRes>(Func<TSrc, TRes> f, TSrc? input, out TRes output)
+            {
+                try
+                {
+                    output = input switch
+                    {
+                        null => default!,
+                        _ => f(input)
+                    };
+                }
+                catch
+                {
+                    output = default!;
+                    return false;
+                }
+
+                return true;
             }
         }
     }
